@@ -1,17 +1,10 @@
 import streamlit as st
 import pandas as pd
 
-# -----------------------------
-# PAGE CONFIG
-# -----------------------------
-st.set_page_config(
-    page_title="SEO SaaS MVP",
-    page_icon="🚀",
-    layout="wide"
-)
+st.set_page_config(page_title="SEO SaaS MVP", layout="wide")
 
 # -----------------------------
-# SESSION STATE INIT
+# SESSION INIT
 # -----------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -27,21 +20,25 @@ if "users" not in st.session_state:
 
 
 # -----------------------------
+# DEBUG (optional - remove later)
+# -----------------------------
+# st.write(st.session_state.users)
+
+
+# -----------------------------
 # CLEAN NUMBER
 # -----------------------------
-def clean_number(value):
+def clean_number(v):
     try:
-        if pd.isna(value):
+        if pd.isna(v):
             return 0
-        if isinstance(value, str):
-            value = value.replace("%", "").strip()
-        return float(value)
+        return float(str(v).replace("%", "").strip())
     except:
         return 0
 
 
 # -----------------------------
-# SEO ANALYSIS ENGINE
+# SEO ENGINE
 # -----------------------------
 def analyze(clicks, impressions, ctr, position):
 
@@ -50,15 +47,15 @@ def analyze(clicks, impressions, ctr, position):
 
     if impressions > 1000 and ctr < 2:
         score += 40
-        actions.append("Improve title & meta (low CTR)")
+        actions.append("Improve title/meta (CTR issue)")
 
     if position > 10:
         score += 30
-        actions.append("Improve content depth & SEO structure")
+        actions.append("Improve content depth")
 
     if clicks < 10:
         score += 20
-        actions.append("Expand content + add FAQs")
+        actions.append("Expand content")
 
     if score >= 60:
         priority = "HIGH 🔴"
@@ -71,49 +68,59 @@ def analyze(clicks, impressions, ctr, position):
 
 
 # -----------------------------
-# LOGIN PAGE
+# LOGIN
 # -----------------------------
-def login_page():
+def login():
 
-    st.title("🔐 Login to SEO SaaS")
+    st.title("🔐 Login")
 
-    with st.container():
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+    username = st.text_input("Username", key="login_user")
+    password = st.text_input("Password", type="password", key="login_pass")
 
-        if st.button("Login"):
+    if st.button("Login"):
 
-            users = st.session_state.users
+        users = st.session_state.users
 
-            if username in users and users[username] == password:
-                st.session_state.logged_in = True
-                st.session_state.user = username
-                st.success("Login successful ✔")
-                st.rerun()
-            else:
-                st.error("Invalid credentials")
+        # DEBUG HELP
+        # st.write("Users:", users)
+
+        if username in users and users[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.user = username
+            st.success("Login successful ✔")
+            st.rerun()
+        else:
+            st.error("Invalid credentials ❌")
 
 
 # -----------------------------
-# SIGNUP PAGE
+# SIGNUP (FIXED)
 # -----------------------------
-def signup_page():
+def signup():
 
-    st.title("🆕 Create Account")
+    st.title("🆕 Sign Up")
 
-    with st.container():
-        new_user = st.text_input("New Username")
-        new_pass = st.text_input("New Password", type="password")
+    new_user = st.text_input("Create Username", key="signup_user")
+    new_pass = st.text_input("Create Password", type="password", key="signup_pass")
 
-        if st.button("Sign Up"):
+    if st.button("Create Account"):
 
-            if new_user in st.session_state.users:
-                st.error("User already exists")
-            elif new_user == "" or new_pass == "":
-                st.warning("Fill all fields")
-            else:
-                st.session_state.users[new_user] = new_pass
-                st.success("Account created! Go to login.")
+        # IMPORTANT: always read latest state
+        users = st.session_state.users.copy()
+
+        if new_user in users:
+            st.error("User already exists")
+            return
+
+        if new_user.strip() == "" or new_pass.strip() == "":
+            st.warning("Please fill all fields")
+            return
+
+        # SAVE USER PROPERLY
+        users[new_user] = new_pass
+        st.session_state.users = users
+
+        st.success("Account created ✔ Now login")
 
 
 # -----------------------------
@@ -121,23 +128,20 @@ def signup_page():
 # -----------------------------
 def dashboard():
 
-    st.sidebar.title(f"👋 Welcome {st.session_state.user}")
+    st.sidebar.title(f"👋 {st.session_state.user}")
 
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.user = ""
         st.rerun()
 
-    st.title("🚀 SEO Intelligence Dashboard")
-    st.caption("Upload GSC CSV and get insights")
+    st.title("🚀 SEO Dashboard")
 
-    uploaded_file = st.file_uploader("Upload Google Search Console CSV", type=["csv"])
+    file = st.file_uploader("Upload GSC CSV", type=["csv"])
 
-    if uploaded_file:
+    if file:
 
-        df = pd.read_csv(uploaded_file)
-
-        st.subheader("📄 Raw Data Preview")
+        df = pd.read_csv(file)
         st.dataframe(df, use_container_width=True)
 
         results = []
@@ -146,7 +150,7 @@ def dashboard():
 
             clicks = clean_number(row.get("Clicks", 0))
             impressions = clean_number(row.get("Impressions", 0))
-            ctr = clean_number(str(row.get("CTR", 0)).replace("%", ""))
+            ctr = clean_number(row.get("CTR", 0))
             position = clean_number(row.get("Position", 0))
 
             priority, actions = analyze(clicks, impressions, ctr, position)
@@ -161,23 +165,21 @@ def dashboard():
                 "Recommendations": " | ".join(actions)
             })
 
-        st.subheader("📊 SEO Insights")
+        out = pd.DataFrame(results)
 
-        st.dataframe(
-            pd.DataFrame(results),
-            use_container_width=True
-        )
+        st.subheader("📊 SEO Insights")
+        st.dataframe(out, use_container_width=True)
 
         st.download_button(
             "📥 Download Report",
-            pd.DataFrame(results).to_csv(index=False),
+            out.to_csv(index=False),
             "seo_report.csv",
             mime="text/csv"
         )
 
 
 # -----------------------------
-# MAIN APP ROUTER
+# ROUTER
 # -----------------------------
 def main():
 
@@ -187,9 +189,9 @@ def main():
         menu = st.sidebar.radio("Menu", ["Login", "Sign Up"])
 
         if menu == "Login":
-            login_page()
+            login()
         else:
-            signup_page()
+            signup()
 
 
 main()
